@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[project]
+name = "bertgery"
+version="0.0.1"
+authors = [
+    {name = "Benjamin Anderson", email = "ben@trytaylor.ai"},
+]
+description = "model surgery for transformer encoders"
+readme = "README.md"
+requires-python = ">=3.9"
+keywords = []
+license = {text = ""}
+classifiers = []
+dependencies = [
+    "torch>=2.2.1",
+    "transformers>=4.40.1"
+]

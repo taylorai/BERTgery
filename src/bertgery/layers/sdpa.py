@@ -68,23 +68,10 @@ class BertSDPA(nn.Module):
         output_attentions: Optional[bool] = False,
     ) -> Tuple[torch.Tensor]:
         # do separate linear layers for qkv if not merged
-        if self.qkv_A is None:
-            key_layer = self.transpose_for_scores(self.key(hidden_states))
-            value_layer = self.transpose_for_scores(self.value(hidden_states))
-            query_layer = self.transpose_for_scores(self.query(hidden_states))
+        key_layer = self.transpose_for_scores(self.key(hidden_states))
+        value_layer = self.transpose_for_scores(self.value(hidden_states))
+        query_layer = self.transpose_for_scores(self.query(hidden_states))
 
-        # otherwise, use merged qkv
-        else:
-            r1 = self.qkv_A(hidden_states)  # b, m, r
-            r2 = self.qkv_B(r1)  # b, m, 3h
-            q, k, v = r2.chunk(3, dim=-1)
-            query_layer, key_layer, value_layer = (
-                self.transpose_for_scores(q),
-                self.transpose_for_scores(k),
-                self.transpose_for_scores(v),
-            )
-
-        # use xformers if available
         batch_size, seq_len = hidden_states.shape[0], hidden_states.shape[1]
         bias = attention_mask.view(batch_size, 1, seq_len)  # b, 1, k_len
         bias = bias.expand(-1, seq_len, -1).unsqueeze(1)  # b, q_len, k_len

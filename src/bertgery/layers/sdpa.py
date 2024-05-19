@@ -52,10 +52,8 @@ class BertSDPA(nn.Module):
             self.num_attention_heads,
             self.attention_head_size,
         )
-        if self.use_xformers:
-            return x.view(new_x_shape)  # b, m, h, k
-        else:
-            return x.view(new_x_shape).permute(0, 2, 1, 3)  # b, h, m, k
+        
+        return x.view(new_x_shape).permute(0, 2, 1, 3)  # b, h, m, k
 
     def forward(
         self,

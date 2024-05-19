@@ -8,5 +8,6 @@ def patch_attention(bert_model: BertModel):
     """
     for layer in bert_model.encoder.layer:
         layer.attention.self = BertSDPA.from_bert_attention(
-            bert_model.config
+            bert_model.config,
+            layer.attention.self
         )

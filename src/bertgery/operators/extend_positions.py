@@ -1,5 +1,6 @@
-from transformers import BertModel
+import torch
 import torch.nn as nn
+from transformers import BertModel
 
 def extend_positions(model: BertModel, max_position: int):
     old_position_embeddings = model.embeddings.position_embeddings
@@ -19,3 +20,5 @@ def extend_positions(model: BertModel, max_position: int):
     
     model.embeddings.position_embeddings = new_position_embeddings
     model.config.max_position_embeddings = max_position
+    model.embeddings.position_ids = torch.arange(max_position).unsqueeze(0)
+

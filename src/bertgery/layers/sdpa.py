@@ -88,3 +88,77 @@ class BertSDPA(nn.Module):
         )  # b, m, h, k
 
         return out.flatten(2), None
+    
+class BertFusedSDPA(nn.Module):
+    def __init__(
+        self, 
+        config: BertConfig,
+    ):
+        super().__init__()
+        self.num_attention_heads = config.num_attention_heads
+        self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
+        self.all_head_size = self.num_attention_heads * self.attention_head_size
+        
+        # the original weights are each (hidden_dim, all_head_size. we just concatenate them)
+        self.qkv = nn.Linear(config.hidden_size, 3 * self.all_head_size)
+        self.dropout = config.attention_probs_dropout_prob
+        self.position_embedding_type = "absolute"
+        self.max_position_embeddings = config.max_position_embeddings
+        self.is_decoder = False
+
+    @classmethod
+    def from_bert_attention(
+        cls,
+        config,
+        bert_attention_layer
+    ):
+        config = config
+        new_layer = cls(config)
+
+        # Copy parameters
+        with torch.no_grad():
+            query_weight = bert_attention_layer.query.weight
+            key_weight = bert_attention_layer.key.weight
+            value_weight = bert_attention_layer.value.weight
+            qkv_weight = torch.cat([query_weight, key_weight, value_weight], dim=0)
+            new_layer.qkv.weight.copy_(qkv_weight)
+
+            query_bias = bert_attention_layer.query.bias
+            key_bias = bert_attention_layer.key.bias
+            value_bias = bert_attention_layer.value.bias
+            qkv_bias = torch.cat([query_bias, key_bias, value_bias], dim=0)
+            new_layer.qkv.bias.copy_(qkv_bias)
+
+        del bert_attention_layer
+        return new_layer
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        head_mask: Optional[torch.FloatTensor] = None,
+        encoder_hidden_states: Optional[torch.FloatTensor] = None,
+        encoder_attention_mask: Optional[torch.FloatTensor] = None,
+        past_key_value: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
+        output_attentions: Optional[bool] = False,
+    ) -> Tuple[torch.Tensor]:
+        batch_size, seq_len = hidden_states.shape[0], hidden_states.shape[1]
+        qkv = self.qkv(hidden_states).view(batch_size, seq_len, 3, self.num_attention_heads, self.attention_head_size)
+        q, k, v = qkv.permute(0, 3, 2, 1, 4).unbind(2)
+
+        # only need to expand attention mask if it's not already b, l, l
+        if attention_mask.numel() < batch_size * seq_len**2:
+            bias = attention_mask.view(batch_size, 1, seq_len)  # b, 1, k_len
+            bias = bias.expand(-1, seq_len, -1).unsqueeze(1)  # b, q_len, k_len
+        else:
+            bias = attention_mask.view(batch_size, 1, seq_len, seq_len)  # b, 1, q_len, k_len
+        out = nn.functional.scaled_dot_product_attention(
+            q, k, v,
+            dropout_p=self.dropout,
+            attn_mask=bias,  # b, 1, q_len, k_len, broadcast happens automatically
+        ).transpose(
+            1, 2
+        )  # b, m, h, k
+
+        return out.flatten(2), None
+        

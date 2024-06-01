@@ -72,6 +72,8 @@ class BertSDPA(nn.Module):
 
         batch_size, seq_len = hidden_states.shape[0], hidden_states.shape[1]
         # only need to expand attention mask if it's not already b, l, l
+        if attention_mask is None:
+            attention_mask = torch.ones((batch_size, seq_len, seq_len), device=hidden_states.device)
         if attention_mask.numel() < batch_size * seq_len**2:
             bias = attention_mask.view(batch_size, 1, seq_len)  # b, 1, k_len
             bias = bias.expand(-1, seq_len, -1).unsqueeze(1)  # b, q_len, k_len

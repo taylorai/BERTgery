@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from transformers import BertConfig
+from transformers.models.bert.modeling_bert import BertSelfAttention
 from typing import Optional, Tuple
 
 class BertSDPA(nn.Module):
@@ -25,7 +26,7 @@ class BertSDPA(nn.Module):
     def from_bert_attention(
         cls,
         config,
-        bert_attention_layer
+        bert_attention_layer: BertSelfAttention
     ):
         config = config
         new_layer = cls(config)
@@ -41,6 +42,16 @@ class BertSDPA(nn.Module):
 
         del bert_attention_layer
         return new_layer
+    
+    def to_bert_attention(self):
+        bert_attention = BertSelfAttention(self.config)
+        bert_attention.query.weight.copy_(self.query.weight)
+        bert_attention.query.bias.copy_(self.query.bias)
+        bert_attention.key.weight.copy_(self.key.weight)
+        bert_attention.key.bias.copy_(self.key.bias)
+        bert_attention.value.weight.copy_(self.value.weight)
+        bert_attention.value.bias.copy_(self.value.bias)
+        return bert_attention
 
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -133,6 +144,7 @@ class BertFusedSDPA(nn.Module):
 
         del bert_attention_layer
         return new_layer
+
 
     def forward(
         self,

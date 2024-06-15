@@ -8,10 +8,11 @@ def patch_attention(bert_model: BertModel):
     This modifies the model in place.
     """
     for layer in bert_model.encoder.layer:
+        device = next(layer.parameters()).device
         layer.attention.self = BertSDPA.from_bert_attention(
             bert_model.config,
             layer.attention.self
-        )
+        ).to(device)
 
 def patch_layers(bert_model: BertModel):
     """

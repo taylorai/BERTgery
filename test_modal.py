@@ -4,13 +4,12 @@ from modal import gpu
 image = modal.Image.from_registry('nvcr.io/nvidia/pytorch:24.05-py3').pip_install(
     'packaging',
     'ninja',
-    'transformers',
-    'bertgery@git+https://github.com/taylorai/BERTgery.git@main'
+    'transformers'
 ).run_commands([
     'git clone https://github.com/Dao-AILab/flash-attention.git',
     'cd flash-attention && python setup.py install',
     'cd flash-attention/csrc/fused_dense_lib && pip install .'
-])
+]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@923a174')
 
 app = modal.App('test-bertgery')
 

@@ -33,6 +33,7 @@ class BertSDPA(nn.Module):
         new_layer = cls(config)
 
         # Copy parameters
+        device = next(new_layer.parameters()).device
         with torch.no_grad():
             new_layer.query.weight.copy_(bert_attention_layer.query.weight)
             new_layer.query.bias.copy_(bert_attention_layer.query.bias)
@@ -40,9 +41,9 @@ class BertSDPA(nn.Module):
             new_layer.key.bias.copy_(bert_attention_layer.key.bias)
             new_layer.value.weight.copy_(bert_attention_layer.value.weight)
             new_layer.value.bias.copy_(bert_attention_layer.value.bias)
-        device = next(new_layer.parameters()).device
         del bert_attention_layer
-        return new_layer.to(device)
+        new_layer.to(device)
+        return new_layer
     
     def to_bert_attention(self):
         bert_attention = BertSelfAttention(self.config)

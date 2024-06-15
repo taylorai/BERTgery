@@ -9,7 +9,7 @@ image = modal.Image.from_registry('nvcr.io/nvidia/pytorch:24.05-py3').pip_instal
     'git clone https://github.com/Dao-AILab/flash-attention.git',
     'cd flash-attention && python setup.py install',
     'cd flash-attention/csrc/fused_dense_lib && pip install .'
-]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@86a66e3')
+]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@b826cf8')
 
 app = modal.App('test-bertgery')
 
@@ -31,6 +31,9 @@ def test_bertgery():
     output1 = model(**batch).last_hidden_state
     patch_layers(model)
     print(model)
+    for p in model.parameters():
+        print(p.device)
+        p.to('cuda')
     output2 = model(**batch).last_hidden_state
     
     assert torch.allclose(output1, output2), "Patching layers did not work"

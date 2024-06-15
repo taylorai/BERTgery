@@ -52,3 +52,10 @@ class BertLayer(nn.Module):
         layer.output.LayerNorm = self.norm2
         layer.output.dropout = self.dropout2
         return layer
+    
+    def forward(self, hidden_states, attention_mask, **kwargs):
+        attention_output = self.attention(hidden_states, attention_mask)
+        hidden_states = self.norm1(hidden_states + self.dropout1(attention_output))
+        mlp_output = self.mlp(hidden_states)
+        hidden_states = self.norm2(hidden_states + self.dropout2(mlp_output))
+        return hidden_states

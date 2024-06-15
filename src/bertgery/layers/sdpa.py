@@ -10,6 +10,7 @@ class BertSDPA(nn.Module):
         config: BertConfig,
     ):
         super().__init__()
+        self.config = config
         self.num_attention_heads = config.num_attention_heads
         self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size

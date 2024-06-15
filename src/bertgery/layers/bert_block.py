@@ -39,8 +39,9 @@ class BertLayer(nn.Module):
         new_layer.mlp.fc2 = layer.output.dense
         new_layer.norm2 = layer.output.LayerNorm
         new_layer.dropout2 = layer.output.dropout
+        device = next(new_layer.parameters()).device
         del layer
-        return new_layer
+        return new_layer.to(device)
     
     def to_hf_bert_layer(self, config: BertConfig):
         layer = HFBertLayer(config)

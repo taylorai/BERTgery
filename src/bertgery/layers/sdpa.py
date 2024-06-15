@@ -78,6 +78,8 @@ class BertSDPA(nn.Module):
         output_attentions: Optional[bool] = False,
     ) -> Tuple[torch.Tensor]:
         # do separate linear layers for qkv if not merged
+        # check the device of hidden_states and key weight/bias
+        print(hidden_states.device, self.key.weight.device)
         key_layer = self.transpose_for_scores(self.key(hidden_states))
         value_layer = self.transpose_for_scores(self.value(hidden_states))
         query_layer = self.transpose_for_scores(self.query(hidden_states))

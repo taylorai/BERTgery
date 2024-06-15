@@ -61,12 +61,16 @@ class BertSDPA(nn.Module):
         for xformers, input tensors must be in format [B, M, H, K], where B is the batch size, M the sequence length,
         H is the number of heads, and K the embeding size per head
         """
+        print("before transposing", x.size())
         new_x_shape = x.size()[:-1] + (
             self.num_attention_heads,
             self.attention_head_size,
         )
         
-        return x.view(new_x_shape).permute(0, 2, 1, 3)  # b, h, m, k
+        out = x.view(new_x_shape).permute(0, 2, 1, 3)  # b, h, m, k
+        print("after transposing", out.size())
+
+        return out
 
     def forward(
         self,
@@ -80,7 +84,8 @@ class BertSDPA(nn.Module):
     ) -> Tuple[torch.Tensor]:
         # do separate linear layers for qkv if not merged
         # check the device of hidden_states and key weight/bias
-        print(hidden_states.device, self.key.weight.device)
+        # print(hidden_states.device, self.key.weight.device)
+        print(hidden_states.shape)
         key_layer = self.transpose_for_scores(self.key(hidden_states))
         value_layer = self.transpose_for_scores(self.value(hidden_states))
         query_layer = self.transpose_for_scores(self.query(hidden_states))

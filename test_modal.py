@@ -9,7 +9,7 @@ image = modal.Image.from_registry('nvcr.io/nvidia/pytorch:24.05-py3').pip_instal
     'git clone https://github.com/Dao-AILab/flash-attention.git',
     'cd flash-attention && python setup.py install',
     'cd flash-attention/csrc/fused_dense_lib && pip install .'
-]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@3a8b96d')
+]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@60258c0')
 
 app = modal.App('test-bertgery')
 
@@ -22,7 +22,7 @@ def test_bertgery():
     from bertgery.operators import patch_layers, unpatch_layers
     from transformers import BertModel, BertConfig
     model = BertModel.from_pretrained('bert-base-uncased').to('cuda')
-    random_input = torch.randint(0, 1000, (1, 128), device='cuda')
+    random_input = torch.randint(0, 1000, (2, 128), device='cuda')
     batch = {
         "input_ids": random_input,
         "attention_mask": torch.ones_like(random_input, device='cuda')

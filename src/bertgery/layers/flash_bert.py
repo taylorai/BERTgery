@@ -1,7 +1,7 @@
 from typing import Union
-from transformers import BertConfig, BertModel as HFBertModel
+from transformers import BertConfig, BertForPreTraining as HFBertModel
 try:
-    from flash_attn.models.bert import BertModel as FlashAttnBertModel, remap_state_dict
+    from flash_attn.models.bert import BertForPreTraining as FlashAttnBertModel, remap_state_dict
 except ImportError as e:
     raise ImportError("Flash-Attn not available. Please install flash_attn.") from e
 

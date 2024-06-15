@@ -9,7 +9,7 @@ image = modal.Image.from_registry('nvcr.io/nvidia/pytorch:24.05-py3').pip_instal
     'git clone https://github.com/Dao-AILab/flash-attention.git',
     'cd flash-attention && python setup.py install',
     'cd flash-attention/csrc/fused_dense_lib && pip install .'
-]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@fc3204f')
+]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@c5247a9')
 
 app = modal.App('test-bertgery')
 
@@ -35,7 +35,7 @@ def test_bertgery():
     new_model = convert_hf_model_to_flash_attn(model, model.config)
     new_model.to('cuda')
     new_model.eval()
-    output2 = new_model(**{
+    output2 = new_model.bert(**{
         "input_ids": random_input,
         "attention_mask": torch.ones_like(random_input, device='cuda').to(torch.bool)
     }).last_hidden_state

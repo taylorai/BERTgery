@@ -9,7 +9,7 @@ image = modal.Image.from_registry('nvcr.io/nvidia/pytorch:24.05-py3').pip_instal
     'git clone https://github.com/Dao-AILab/flash-attention.git',
     'cd flash-attention && python setup.py install',
     'cd flash-attention/csrc/fused_dense_lib && pip install .'
-]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@a1b625a')
+]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@a2de23e')
 
 app = modal.App('test-bertgery')
 

@@ -61,4 +61,4 @@ class BertLayer(nn.Module):
         mlp_output = self.mlp(hidden_states)
         hidden_states = self.norm2(hidden_states + self.dropout2(mlp_output))
         print("layer forward, output shape:", hidden_states.shape)
-        return hidden_states
+        return (hidden_states,)

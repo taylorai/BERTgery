@@ -40,9 +40,9 @@ class BertSDPA(nn.Module):
             new_layer.key.bias.copy_(bert_attention_layer.key.bias)
             new_layer.value.weight.copy_(bert_attention_layer.value.weight)
             new_layer.value.bias.copy_(bert_attention_layer.value.bias)
-
+        device = next(new_layer.parameters()).device
         del bert_attention_layer
-        return new_layer
+        return new_layer.to(device)
     
     def to_bert_attention(self):
         bert_attention = BertSelfAttention(self.config)

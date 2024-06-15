@@ -55,8 +55,10 @@ class BertLayer(nn.Module):
         return layer
     
     def forward(self, hidden_states, attention_mask, *args, **kwargs):
+        print("layer forward, input shape:", hidden_states.shape)
         attn_out, _ = self.attention(hidden_states, attention_mask)
         hidden_states = self.norm1(hidden_states + self.dropout1(attn_out))
         mlp_output = self.mlp(hidden_states)
         hidden_states = self.norm2(hidden_states + self.dropout2(mlp_output))
+        print("layer forward, output shape:", hidden_states.shape)
         return hidden_states

@@ -9,7 +9,7 @@ image = modal.Image.from_registry('nvcr.io/nvidia/pytorch:24.05-py3').pip_instal
     'git clone https://github.com/Dao-AILab/flash-attention.git',
     'cd flash-attention && python setup.py install',
     'cd flash-attention/csrc/fused_dense_lib && pip install .'
-]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@1312cb0')
+]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@fc3204f')
 
 app = modal.App('test-bertgery')
 
@@ -21,20 +21,24 @@ def test_bertgery():
     import torch
     print("torch version:", torch.__version__)
     from bertgery.layers.flash_bert import convert_hf_model_to_flash_attn
-    from transformers import BertModel, BertConfig
-    model = BertModel.from_pretrained('bert-base-uncased').to('cuda')
+    from transformers import BertForPreTraining, BertConfig
+    model = BertForPreTraining.from_pretrained('bert-base-uncased').to('cuda')
     model.eval()
     random_input = torch.randint(0, 1000, (2, 128), device='cuda')
     batch = {
         "input_ids": random_input,
         "attention_mask": torch.ones_like(random_input, device='cuda')
     }
-    output1 = model(**batch).last_hidden_state
+    output1 = model.bert(**batch).last_hidden_state
+    print("finished running original model")
     
     new_model = convert_hf_model_to_flash_attn(model, model.config)
     new_model.to('cuda')
     new_model.eval()
-    output2 = new_model(**batch).last_hidden_state
+    output2 = new_model(**{
+        "input_ids": random_input,
+        "attention_mask": torch.ones_like(random_input, device='cuda').to(torch.bool)
+    }).last_hidden_state
     
     # print first few elements of the outputs
     print(output1[0, :5, :5])

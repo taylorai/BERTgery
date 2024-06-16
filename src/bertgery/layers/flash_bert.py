@@ -141,7 +141,7 @@ def load_flash_attn_bert(
 def save_flash_attn_bert():
     pass
 
-class FlashBertForSequenceClassification:
+class FlashBertForSequenceClassification(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.num_labels = config.num_labels

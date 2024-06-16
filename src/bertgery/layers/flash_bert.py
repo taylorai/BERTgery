@@ -1,5 +1,5 @@
 from typing import Union
-from transformers import BertConfig, BertForPreTraining as HFBertForPretTraining, BertModel as HFBertModel
+from transformers import BertConfig, BertForPreTraining as HFBertForPreTraining, BertModel as HFBertModel
 try:
     from flash_attn.models.bert import BertForPreTraining as FlashAttnBertModel, remap_state_dict
 except ImportError as e:
@@ -25,7 +25,7 @@ def load_flash_attn_bert(
     Load a Hugging Face BERT model and return a Flash-Attn BERT model.
     """
     hf_config: BertConfig = BertConfig.from_pretrained(model_name_or_path)
-    hf_model = HFBertModel.from_pretrained(model_name_or_path)
+    hf_model = HFBertForPreTraining.from_pretrained(model_name_or_path)
     hf_config.use_flash_attn = True
     hf_config.fused_bias_fc = fused_bias_fc_is_available
     hf_config.fused_mlp = fused_mlp_is_available

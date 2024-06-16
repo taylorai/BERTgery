@@ -11,7 +11,7 @@ image = modal.Image.from_registry('nvcr.io/nvidia/pytorch:24.05-py3').pip_instal
     'cd flash-attention/csrc/fused_dense_lib && pip install .'
 ]).run_commands([
     'cd flash-attention/csrc/layer_norm && pip install .',
-]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@9e62507')
+]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@59c2d1a')
 
 app = modal.App('test-bertgery')
 
@@ -35,7 +35,7 @@ def test_bertgery():
     }
     start = time.time()
     for _ in tqdm.trange(1_000):
-        output1 = model.bert(**batch).last_hidden_state
+        output1 = model(**batch).last_hidden_state
     print("HF Bert step time:", (time.time() - start) / 1_000)
 
     new_model = convert_bertmodel_to_flash_attn_bert(model)
@@ -52,7 +52,7 @@ def test_bertgery():
     }
     start = time.time()
     for _ in tqdm.trange(1_000):
-        output2 = new_model.bert(**batch).last_hidden_state
+        output2 = new_model(**batch).last_hidden_state
     print("Flash-Attn Bert step time:", (time.time() - start) / 1_000)
 
     time.sleep(1)

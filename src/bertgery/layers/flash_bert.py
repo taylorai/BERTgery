@@ -42,7 +42,10 @@ def convert_bertmodel_to_flash_attn_bert(
     hf_config.hidden_act = "gelu_new"
 
     new_model = FlashBertModel(hf_config)
-    remapped_state_dict = remap_state_dict(model.state_dict(), model.config)
+    # add bert. to the beginning of the keys so remap_state_dict works
+    remapped_state_dict = remap_state_dict({
+        "bert." + k: v for k, v in model.state_dict().items()
+    }, model.config)
 
     # edit the state dict to remove the 'bert' from the beginning of the keys
     remapped_state_dict = {

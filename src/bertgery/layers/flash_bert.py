@@ -77,6 +77,7 @@ def convert_flash_attn_bert_to_bertmodel(
     remapped_state_dict = inv_remap_state_dict({
         "bert." + k: v for k, v in model.state_dict().items()
     }, model.config)
+    print("remapped_state_dict:", remapped_state_dict.keys())
 
     # edit the state dict to remove the 'bert' from the beginning of the keys
     remapped_state_dict = {

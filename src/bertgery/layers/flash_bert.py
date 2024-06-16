@@ -143,7 +143,7 @@ def save_flash_attn_bert():
 
 class FlashBertForSequenceClassification:
     def __init__(self, config):
-        super().__init__(config)
+        super().__init__()
         self.num_labels = config.num_labels
         self.config = config
         self.bert = FlashBertModel(config)

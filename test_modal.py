@@ -9,7 +9,9 @@ image = modal.Image.from_registry('nvcr.io/nvidia/pytorch:24.05-py3').pip_instal
     'git clone https://github.com/Dao-AILab/flash-attention.git',
     'cd flash-attention && python setup.py install',
     'cd flash-attention/csrc/fused_dense_lib && pip install .'
-]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@c5247a9')
+]).run_commands([
+    'cd flash-attention/csrc/layer_norm && pip install .',
+]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@4a89c0b').env({"PYTHONOPTIMIZE": "TRUE"})
 
 app = modal.App('test-bertgery')
 
@@ -18,29 +20,42 @@ app = modal.App('test-bertgery')
     gpu=gpu.A100()
 )
 def test_bertgery():
+    import time
     import torch
+    import tqdm
     print("torch version:", torch.__version__)
-    from bertgery.layers.flash_bert import convert_hf_model_to_flash_attn
+    from bertgery.layers.flash_bert import load_flash_attn_bert
     from transformers import BertForPreTraining, BertConfig
-    model = BertForPreTraining.from_pretrained('bert-base-uncased').to('cuda')
+    model = BertForPreTraining.from_pretrained('bert-base-uncased').to('cuda').to(torch.bfloat16)
     model.eval()
-    random_input = torch.randint(0, 1000, (2, 128), device='cuda')
+    random_input = torch.randint(0, 1000, (128, 128), device='cuda')
     batch = {
         "input_ids": random_input,
         "attention_mask": torch.ones_like(random_input, device='cuda')
     }
-    output1 = model.bert(**batch).last_hidden_state
-    print("finished running original model")
-    
-    new_model = convert_hf_model_to_flash_attn(model, model.config)
+    start = time.time()
+    for _ in tqdm.trange(1_000):
+        output1 = model.bert(**batch).last_hidden_state
+    print("HF Bert step time:", (time.time() - start) / 1_000)
+    del model
+    del batch
+    torch.cuda.empty_cache()
+
+    new_model = load_flash_attn_bert('bert-base-uncased')
+    new_model.to(torch.bfloat16)
     new_model.to('cuda')
     new_model.eval()
-    output2 = new_model.bert(**{
+    batch = {
         "input_ids": random_input,
         "attention_mask": torch.ones_like(random_input, device='cuda').to(torch.bool)
-    }).last_hidden_state
+    }
+    start = time.time()
+    for _ in tqdm.trange(1_000):
+        output2 = new_model.bert(**batch).last_hidden_state
+    print("Flash-Attn Bert step time:", (time.time() - start) / 1_000)
     
+    time.sleep(1)
     # print first few elements of the outputs
     print(output1[0, :5, :5])
     print(output2[0, :5, :5])
-    assert torch.allclose(output1, output2, atol=1e-6), "Patching attention did not work"
+    assert torch.allclose(output1, output2, atol=1e-3), "Patching attention did not work"

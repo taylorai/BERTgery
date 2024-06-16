@@ -83,10 +83,12 @@ def convert_flash_attn_bert_to_bertmodel(
     remapped_state_dict = {
         re.sub(r"^bert\.", "", k): v for k, v in remapped_state_dict.items()
     }
+    print("remapped_state_dict after re.sub:", remapped_state_dict.keys())
     
     # check for keys present in one but not the other
     pretrained_keys = set(remapped_state_dict.keys())
     new_keys = set(new_model.state_dict().keys())
+    print("new keys:", new_keys)
     missing_from_pretrained = new_keys - pretrained_keys
     print("WARNING: Missing keys from pretrained model:", missing_from_pretrained)
     

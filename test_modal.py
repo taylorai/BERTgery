@@ -11,7 +11,7 @@ image = modal.Image.from_registry('nvcr.io/nvidia/pytorch:24.05-py3').pip_instal
     'cd flash-attention/csrc/fused_dense_lib && pip install .'
 ]).run_commands([
     'cd flash-attention/csrc/layer_norm && pip install .',
-]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@f76339e')
+]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@9e62507')
 
 app = modal.App('test-bertgery')
 
@@ -24,9 +24,9 @@ def test_bertgery():
     import torch
     import tqdm
     print("torch version:", torch.__version__)
-    from bertgery.layers.flash_bert import load_flash_attn_bert
-    from transformers import BertForPreTraining, BertConfig
-    model = BertForPreTraining.from_pretrained('bert-base-uncased').to('cuda').to(torch.bfloat16)
+    from bertgery.layers.flash_bert import load_flash_attn_bert, convert_bertmodel_to_flash_attn_bert
+    from transformers import BertForPreTraining, BertModel, BertConfig
+    model = BertModel.from_pretrained('bert-base-uncased').to('cuda').to(torch.bfloat16)
     model.eval()
     random_input = torch.randint(0, 1000, (128, 128), device='cuda')
     batch = {
@@ -37,11 +37,12 @@ def test_bertgery():
     for _ in tqdm.trange(1_000):
         output1 = model.bert(**batch).last_hidden_state
     print("HF Bert step time:", (time.time() - start) / 1_000)
+
+    new_model = convert_bertmodel_to_flash_attn_bert(model)
     del model
     del batch
     torch.cuda.empty_cache()
 
-    new_model = load_flash_attn_bert('bert-base-uncased')
     new_model.to(torch.bfloat16)
     new_model.to('cuda')
     new_model.eval()

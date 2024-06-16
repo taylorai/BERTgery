@@ -33,7 +33,15 @@ def convert_bertmodel_to_flash_attn_bert(
     Convert a Hugging Face BERT model to a Flash-Attn BERT model.
     """
     # convert the model
-    new_model = FlashBertModel(model.config)
+    hf_config = model.config
+    hf_config.use_flash_attn = True
+    hf_config.fused_bias_fc = fused_bias_fc_is_available
+    hf_config.fused_mlp = fused_mlp_is_available
+    hf_config.fused_dropout_add_ln = fused_dropout_add_ln_is_available
+    # set activation to gelu_new
+    hf_config.hidden_act = "gelu_new"
+
+    new_model = FlashBertModel(hf_config)
     remapped_state_dict = remap_state_dict(model.state_dict(), model.config)
 
     # edit the state dict to remove the 'bert' from the beginning of the keys

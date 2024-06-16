@@ -33,8 +33,16 @@ try:
 except ImportError as e:
     fused_dropout_add_ln_is_available = False
 
-# TODO: alternative version of remapping state dict that lets you do the sequence classification etc.
-# BERT shapes.
+
+def update_config_for_flash_attn(config: BertConfig):
+    config.use_flash_attn = True
+    config.fused_bias_fc = fused_bias_fc_is_available
+    config.fused_mlp = fused_mlp_is_available
+    config.fused_dropout_add_ln = fused_dropout_add_ln_is_available
+    # set activation to gelu_new
+    config.hidden_act = "gelu_new"
+    return config
+
 def convert_bertmodel_to_flash_attn_bert(
     model: HFBertModel,
 ):
@@ -42,19 +50,12 @@ def convert_bertmodel_to_flash_attn_bert(
     Convert a Hugging Face BERT model to a Flash-Attn BERT model.
     """
     # convert the model
-    hf_config = model.config
-    hf_config.use_flash_attn = True
-    hf_config.fused_bias_fc = fused_bias_fc_is_available
-    hf_config.fused_mlp = fused_mlp_is_available
-    hf_config.fused_dropout_add_ln = fused_dropout_add_ln_is_available
-    # set activation to gelu_new
-    hf_config.hidden_act = "gelu_new"
-
-    new_model = FlashBertModel(hf_config)
+    config = update_config_for_flash_attn(model.config)
+    new_model = FlashBertModel(config)
     # add bert. to the beginning of the keys so remap_state_dict works
     remapped_state_dict = remap_state_dict({
         "bert." + k: v for k, v in model.state_dict().items()
-    }, model.config)
+    }, config)
 
     # edit the state dict to remove the 'bert' from the beginning of the keys
     remapped_state_dict = {
@@ -120,12 +121,7 @@ def load_flash_attn_bert(
     """
     hf_config: BertConfig = BertConfig.from_pretrained(model_name_or_path)
     hf_model = HFBertForPreTraining.from_pretrained(model_name_or_path)
-    hf_config.use_flash_attn = True
-    hf_config.fused_bias_fc = fused_bias_fc_is_available
-    hf_config.fused_mlp = fused_mlp_is_available
-    hf_config.fused_dropout_add_ln = fused_dropout_add_ln_is_available
-    # set activation to gelu_new
-    hf_config.hidden_act = "gelu_new"
+    hf_config = update_config_for_flash_attn(hf_config)
     new_model = FlashAttnBertModel(hf_config)
     pretrained_state_dict = hf_model.state_dict()
     remapped_state_dict = remap_state_dict(pretrained_state_dict, hf_config)
@@ -158,11 +154,8 @@ class FlashBertForSequenceClassification:
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
     @classmethod
-    def from_hf_bert_for_sequence_classification(
-        cls,
-        model: HFBertForSequenceClassification,
-        config: BertConfig,
-    ):
+    def from_hf_bert_for_sequence_classification(cls, model: HFBertForSequenceClassification):
+        config = update_config_for_flash_attn(model.config)
         new_model = cls(config)
         new_model.bert = convert_bertmodel_to_flash_attn_bert(model.bert)
         new_model.dropout = model.dropout

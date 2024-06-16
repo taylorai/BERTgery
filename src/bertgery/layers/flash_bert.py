@@ -1,6 +1,14 @@
 import re
-from typing import Union
-from transformers import BertConfig, BertForPreTraining as HFBertForPreTraining, BertModel as HFBertModel
+import torch
+import torch.nn as nn
+from typing import Union, Tuple, Optional
+from transformers import (
+    BertConfig, 
+    BertForPreTraining as HFBertForPreTraining, 
+    BertModel as HFBertModel,
+    BertForSequenceClassification as HFBertForSequenceClassification
+)
+from transformers.modeling_outputs import SequenceClassifierOutput, BaseModelOutputWithPoolingAndCrossAttentions
 try:
     from flash_attn.models.bert import (
         BertForPreTraining as FlashBertForPreTraining, 
@@ -136,3 +144,66 @@ def load_flash_attn_bert(
 
 def save_flash_attn_bert():
     pass
+
+class FlashBertForSequenceClassification:
+    def __init__(self, config):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+        self.config = config
+        self.bert = FlashBertModel(config)
+        classifier_dropout = (
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.dropout = nn.Dropout(classifier_dropout)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+
+    @classmethod
+    def from_hf_bert_for_sequence_classification(
+        cls,
+        model: HFBertForSequenceClassification,
+        config: BertConfig,
+    ):
+        new_model = cls(config)
+        new_model.bert = convert_bertmodel_to_flash_attn_bert(model.bert)
+        new_model.dropout = model.dropout
+        new_model.classifier = model.classifier
+        return new_model
+    
+    def to_hf_bert_for_sequence_classification(self):
+        model = HFBertForSequenceClassification(self.config)
+        model.bert = convert_flash_attn_bert_to_bertmodel(self.bert)
+        model.dropout = self.dropout
+        model.classifier = self.classifier
+        return model
+
+    def forward(
+        self,
+        input_ids,
+        position_ids=None,
+        token_type_ids=None,
+        attention_mask=None,
+        **kwargs, # these are summarily ignored lol
+    ) -> Union[Tuple[torch.Tensor], SequenceClassifierOutput]:
+        r"""
+        labels (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
+            Labels for computing the sequence classification/regression loss. Indices should be in `[0, ...,
+            config.num_labels - 1]`. If `config.num_labels == 1` a regression loss is computed (Mean-Square loss), If
+            `config.num_labels > 1` a classification loss is computed (Cross-Entropy).
+        """
+        outputs: BaseModelOutputWithPoolingAndCrossAttentions = self.bert(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            masked_tokens_mask=None
+        )
+        pooled_output = outputs.pooler_output
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)
+
+        return SequenceClassifierOutput(
+            loss=None,
+            logits=logits,
+            hidden_states=None,
+            attentions=None,
+        )

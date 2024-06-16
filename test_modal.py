@@ -11,7 +11,7 @@ image = modal.Image.from_registry('nvcr.io/nvidia/pytorch:24.05-py3').pip_instal
     'cd flash-attention/csrc/fused_dense_lib && pip install .'
 ]).run_commands([
     'cd flash-attention/csrc/layer_norm && pip install .',
-]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@1ab76fb')
+]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@c00b1bb')
 
 app = modal.App('test-bertgery')
 
@@ -37,13 +37,11 @@ def test_bertgery():
         "attention_mask": torch.ones_like(random_input, device='cuda')
     }
     start = time.time()
-    for _ in tqdm.trange(400):
+    for _ in tqdm.trange(2_000):
         output1 = model(**batch).last_hidden_state
-    print("HF Bert step time:", (time.time() - start) / 400)
+    print("HF Bert step time:", (time.time() - start) / 2_000)
 
     new_model = convert_bertmodel_to_flash_attn_bert(model)
-    del model
-    del batch
     torch.cuda.empty_cache()
 
     new_model.to(torch.bfloat16)
@@ -54,9 +52,9 @@ def test_bertgery():
         "attention_mask": torch.ones_like(random_input, device='cuda').to(torch.bool)
     }
     start = time.time()
-    for _ in tqdm.trange(400):
+    for _ in tqdm.trange(2_000):
         output2 = new_model(**batch).last_hidden_state
-    print("Flash-Attn Bert step time:", (time.time() - start) / 400)
+    print("Flash-Attn Bert step time:", (time.time() - start) / 2_000)
 
     time.sleep(1)
     # print first few elements of the outputs
@@ -66,4 +64,7 @@ def test_bertgery():
     print("converting back to hf bert")
     new_model = convert_flash_attn_bert_to_bertmodel(new_model)
 
+    # make sure new_model has same weights as model
+    for p1, p2 in zip(model.parameters(), new_model.parameters()):
+        assert torch.allclose(p1, p2), "weights don't match"
     print("conversion successful")

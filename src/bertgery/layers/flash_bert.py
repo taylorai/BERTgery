@@ -24,12 +24,14 @@ def load_flash_attn_bert(
     """
     Load a Hugging Face BERT model and return a Flash-Attn BERT model.
     """
-    hf_config = BertConfig.from_pretrained(model_name_or_path)
+    hf_config: BertConfig = BertConfig.from_pretrained(model_name_or_path)
     hf_model = HFBertModel.from_pretrained(model_name_or_path)
     hf_config.use_flash_attn = True
     hf_config.fused_bias_fc = fused_bias_fc_is_available
     hf_config.fused_mlp = fused_mlp_is_available
     hf_config.fused_dropout_add_ln = fused_dropout_add_ln_is_available
+    # set activation to gelu_new
+    hf_config.hidden_act = "gelu_new"
     new_model = FlashAttnBertModel(hf_config)
     pretrained_state_dict = hf_model.state_dict()
     remapped_state_dict = remap_state_dict(pretrained_state_dict, hf_config)

@@ -83,6 +83,14 @@ def convert_flash_attn_bert_to_bertmodel(
     remapped_state_dict = {
         re.sub(r"^bert\.", "", k): v for k, v in remapped_state_dict.items()
     }
+
+    # substitute .gamma for .weight and .beta for .bias -- bug in original inv_remap_state_dict
+    remapped_state_dict = {
+        re.sub(r"\.gamma", ".weight", k): v for k, v in remapped_state_dict.items()
+    }
+    remapped_state_dict = {
+        re.sub(r"\.beta", ".bias", k): v for k, v in remapped_state_dict.items()
+    }
     print("remapped_state_dict after re.sub:", remapped_state_dict.keys())
     
     # check for keys present in one but not the other

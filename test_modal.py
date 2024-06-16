@@ -11,7 +11,7 @@ image = modal.Image.from_registry('nvcr.io/nvidia/pytorch:24.05-py3').pip_instal
     'cd flash-attention/csrc/fused_dense_lib && pip install .'
 ]).run_commands([
     'cd flash-attention/csrc/layer_norm && pip install .',
-]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@31060cb')
+]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@1ab76fb')
 
 app = modal.App('test-bertgery')
 

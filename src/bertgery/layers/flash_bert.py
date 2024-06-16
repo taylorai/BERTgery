@@ -5,7 +5,8 @@ try:
     from flash_attn.models.bert import (
         BertForPreTraining as FlashBertForPreTraining, 
         BertModel as FlashBertModel,
-        remap_state_dict
+        remap_state_dict,
+        inv_remap_state_dict
     )
 except ImportError as e:
     raise ImportError("Flash-Attn not available. Please install flash_attn.") from e
@@ -57,6 +58,37 @@ def convert_bertmodel_to_flash_attn_bert(
     new_keys = set(new_model.state_dict().keys())
     missing_from_pretrained = new_keys - pretrained_keys
     print("WARNING: Missing keys from pretrained model:", missing_from_pretrained)
+    new_model.load_state_dict(remapped_state_dict)
+    return new_model
+
+def convert_flash_attn_bert_to_bertmodel(
+    model: FlashBertModel,
+):
+    """
+    Convert a Flash-Attn BERT model to a Hugging Face BERT model.
+    """
+    # convert the model
+    hf_config = model.config
+    # set activation to gelu -- probably shouldn't do this if model was finetuned with gelu_new?
+    # hf_config.hidden_act = "gelu"
+    new_model = HFBertModel(hf_config)
+    
+    # add bert. to the beginning of the keys so remap_state_dict works
+    remapped_state_dict = inv_remap_state_dict({
+        "bert." + k: v for k, v in model.state_dict().items()
+    }, model.config)
+
+    # edit the state dict to remove the 'bert' from the beginning of the keys
+    remapped_state_dict = {
+        re.sub(r"^bert\.", "", k): v for k, v in remapped_state_dict.items()
+    }
+    
+    # check for keys present in one but not the other
+    pretrained_keys = set(remapped_state_dict.keys())
+    new_keys = set(new_model.state_dict().keys())
+    missing_from_pretrained = new_keys - pretrained_keys
+    print("WARNING: Missing keys from pretrained model:", missing_from_pretrained)
+    
     new_model.load_state_dict(remapped_state_dict)
     return new_model
 

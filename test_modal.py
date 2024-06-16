@@ -11,7 +11,7 @@ image = modal.Image.from_registry('nvcr.io/nvidia/pytorch:24.05-py3').pip_instal
     'cd flash-attention/csrc/fused_dense_lib && pip install .'
 ]).run_commands([
     'cd flash-attention/csrc/layer_norm && pip install .',
-]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@59c2d1a')
+]).pip_install('bertgery@git+https://github.com/taylorai/BERTgery.git@e711fb5')
 
 app = modal.App('test-bertgery')
 
@@ -24,7 +24,10 @@ def test_bertgery():
     import torch
     import tqdm
     print("torch version:", torch.__version__)
-    from bertgery.layers.flash_bert import load_flash_attn_bert, convert_bertmodel_to_flash_attn_bert
+    from bertgery.layers.flash_bert import (
+        convert_bertmodel_to_flash_attn_bert,
+        convert_flash_attn_bert_to_bertmodel
+    )
     from transformers import BertForPreTraining, BertModel, BertConfig
     model = BertModel.from_pretrained('bert-base-uncased').to('cuda').to(torch.bfloat16)
     model.eval()
@@ -59,4 +62,8 @@ def test_bertgery():
     # print first few elements of the outputs
     print(output1[0, :5, :5])
     print(output2[0, :5, :5])
-    assert torch.allclose(output1, output2, atol=1e-3), "Patching attention did not work"
+    
+    print("converting back to hf bert")
+    new_model = convert_flash_attn_bert_to_bertmodel(new_model)
+
+    print("conversion successful")

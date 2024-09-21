@@ -3,18 +3,19 @@ import torch
 import torch.nn as nn
 from typing import Union, Tuple, Optional
 from transformers import (
-    BertConfig, 
-    BertForPreTraining as HFBertForPreTraining, 
+    BertConfig,
+    BertForPreTraining as HFBertForPreTraining,
     BertModel as HFBertModel,
     BertForSequenceClassification as HFBertForSequenceClassification
 )
 from transformers.modeling_outputs import SequenceClassifierOutput, BaseModelOutputWithPoolingAndCrossAttentions
 try:
     from flash_attn.models.bert import (
-        BertForPreTraining as FlashBertForPreTraining, 
+        BertForPreTraining as FlashBertForPreTraining,
         BertModel as FlashBertModel,
         remap_state_dict,
-        inv_remap_state_dict
+        inv_remap_state_dict,
+        layer_norm,
     )
 except ImportError as e:
     raise ImportError("Flash-Attn not available. Please install flash_attn.") from e
@@ -33,6 +34,60 @@ try:
 except ImportError as e:
     fused_dropout_add_ln_is_available = False
 
+
+class CustomFlashBertModel(FlashBertModel):
+    """
+    Implements a custom forward_embeds function that allows providing inputs_embeds instead of input_ids.
+    """
+    def forward_embeds(
+        self,
+        hidden_states: torch.Tensor, # shape [batch_size, seq_len, hidden_size]
+        position_ids=None,
+        token_type_ids=None,
+        attention_mask=None,
+        masked_tokens_mask=None
+    ):
+        # hidden states is the output of the embedding layer
+        # TD [2022-12:18]: Don't need to force residual in fp32
+        # BERT puts embedding LayerNorm before embedding dropout.
+        if not self.fused_dropout_add_ln:
+            hidden_states = self.emb_ln(hidden_states)
+        else:
+            hidden_states = layer_norm(hidden_states, self.emb_ln.weight, self.emb_ln.bias,
+                                        self.emb_ln.eps)
+        hidden_states = self.emb_drop(hidden_states)
+
+        if masked_tokens_mask is not None:
+            batch_size, seqlen = hidden_states.shape[:2]
+            # We also need the first column for the CLS token
+            first_col_mask = torch.zeros(batch_size, seqlen, dtype=torch.bool,
+                                            device=hidden_states.device)
+            first_col_mask[:, 0] = True
+            subset_mask = masked_tokens_mask | first_col_mask
+        else:
+            subset_mask = None
+
+        sequence_output = self.encoder(hidden_states, key_padding_mask=attention_mask,
+                                        subset_mask=subset_mask)
+
+        if masked_tokens_mask is None:
+            pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
+        else:
+            # TD [2022-03-01]: the indexing here is very tricky.
+            if attention_mask is not None:
+                subset_idx = subset_mask[attention_mask]
+                pool_input = sequence_output[first_col_mask[attention_mask][subset_idx]]
+                sequence_output = sequence_output[masked_tokens_mask[attention_mask][subset_idx]]
+            else:
+                pool_input = sequence_output[first_col_mask[subset_mask]]
+                sequence_output = sequence_output[masked_tokens_mask[subset_mask]]
+            pooled_output = (self.pooler(pool_input, pool=False)
+                                if self.pooler is not None else None)
+
+        return BaseModelOutputWithPoolingAndCrossAttentions(
+            last_hidden_state=sequence_output,
+            pooler_output=pooled_output,
+        )
 
 def update_config_for_flash_attn(config: BertConfig):
     config.use_flash_attn = True
@@ -61,7 +116,7 @@ def convert_bertmodel_to_flash_attn_bert(
     remapped_state_dict = {
         re.sub(r"^bert\.", "", k): v for k, v in remapped_state_dict.items()
     }
-    
+
     # check for keys present in one but not the other
     pretrained_keys = set(remapped_state_dict.keys())
     new_keys = set(new_model.state_dict().keys())
@@ -81,7 +136,7 @@ def convert_flash_attn_bert_to_bertmodel(
     # set activation to gelu -- probably shouldn't do this if model was finetuned with gelu_new?
     # hf_config.hidden_act = "gelu"
     new_model = HFBertModel(hf_config)
-    
+
     # add bert. to the beginning of the keys so remap_state_dict works
     remapped_state_dict = inv_remap_state_dict({
         "bert." + k: v for k, v in model.state_dict().items()
@@ -101,14 +156,14 @@ def convert_flash_attn_bert_to_bertmodel(
         re.sub(r"\.beta", ".bias", k): v for k, v in remapped_state_dict.items()
     }
     print("remapped_state_dict after re.sub:", remapped_state_dict.keys())
-    
+
     # check for keys present in one but not the other
     pretrained_keys = set(remapped_state_dict.keys())
     new_keys = set(new_model.state_dict().keys())
     print("new keys:", new_keys)
     missing_from_pretrained = new_keys - pretrained_keys
     print("WARNING: Missing keys from pretrained model:", missing_from_pretrained)
-    
+
     new_model.load_state_dict(remapped_state_dict)
     return new_model
 
@@ -131,11 +186,11 @@ def load_flash_attn_bert(
     new_keys = set(new_model.state_dict().keys())
     missing_from_pretrained = new_keys - pretrained_keys
     print("WARNING: Missing keys from pretrained model:", missing_from_pretrained)
-    
+
     new_model.load_state_dict(remapped_state_dict, strict=False)
     if return_only_bert:
         new_model = new_model.bert
-    
+
     return new_model
 
 def save_flash_attn_bert():
@@ -161,7 +216,7 @@ class FlashBertForSequenceClassification(nn.Module):
         new_model.dropout = model.dropout
         new_model.classifier = model.classifier
         return new_model
-    
+
     def to_hf_bert_for_sequence_classification(self):
         model = HFBertForSequenceClassification(self.config)
         model.bert = convert_flash_attn_bert_to_bertmodel(self.bert)

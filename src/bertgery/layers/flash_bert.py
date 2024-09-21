@@ -106,7 +106,7 @@ def convert_bertmodel_to_flash_attn_bert(
     """
     # convert the model
     config = update_config_for_flash_attn(model.config)
-    new_model = FlashBertModel(config)
+    new_model = CustomFlashBertModel(config)
     # add bert. to the beginning of the keys so remap_state_dict works
     remapped_state_dict = remap_state_dict({
         "bert." + k: v for k, v in model.state_dict().items()
@@ -126,7 +126,7 @@ def convert_bertmodel_to_flash_attn_bert(
     return new_model
 
 def convert_flash_attn_bert_to_bertmodel(
-    model: FlashBertModel,
+    model: CustomFlashBertModel,
 ):
     """
     Convert a Flash-Attn BERT model to a Hugging Face BERT model.
@@ -201,7 +201,7 @@ class FlashBertForSequenceClassification(nn.Module):
         super().__init__()
         self.num_labels = config.num_labels
         self.config = config
-        self.bert = FlashBertModel(config)
+        self.bert = CustomFlashBertModel(config)
         classifier_dropout = (
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
